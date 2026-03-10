@@ -1,5 +1,10 @@
 .venv
 .DS_Store
+.env
+.python-version
+
+
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
