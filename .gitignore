@@ -2,7 +2,7 @@
 .DS_Store
 .env
 .python-version
-
+*.pt
 
 
 
