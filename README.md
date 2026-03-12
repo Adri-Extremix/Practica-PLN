@@ -36,3 +36,30 @@ Para los fragmentos predichos que coincidan:
 - Actor: Uno mismo (Self), Otro (Other), Mundo/Sistema (World/System), No claro.
 
 > Solo se calcula cuando los fragmentos están alineados.
+
+## Estructura de trabajo
+
+- `LLMs/`: primera aproximacion con modelos servidos por Ollama o cualquier API compatible con OpenAI.
+- `Fine-Tuning/`: espacio reservado para los experimentos supervisados por subtarea.
+- `shared/`: utilidades comunes para ambas lineas, como lectura del dataset, esquemas y EDA.
+
+## Primera base implementada
+
+Se ha dejado preparada una base inicial para la aproximacion con LLMs:
+
+- Lectura comun de datasets en `shared/dataset.py` para `.jsonl`, `.json`, `.csv` y `.tsv`.
+- EDA rapido en `shared/eda.py` y `shared/run_eda.py`.
+- Pipeline de inferencia en `LLMs/run_inference.py`.
+- Cliente HTTP compatible con OpenAI para usar Ollama en `LLMs/client.py`.
+- Validacion y normalizacion de salida en `LLMs/postprocess.py`.
+
+## Configuracion rapida con Ollama
+
+1. Copia `.env.example` a `.env`.
+2. Arranca Ollama localmente.
+3. Ajusta el modelo en `OPENAI_MODEL`.
+4. Ejecuta la inferencia:
+
+```bash
+python3 LLMs/run_inference.py --input HopeEXP_Train.jsonl --output outputs/dev_predictions.jsonl --verbose
+```
