@@ -430,9 +430,6 @@ def evaluate_span_predictions(
     predictions: dict[str | int, list[SpanCandidate]],
 ) -> dict[str, float]:
     rouge_scores: list[float] = []
-    exact_tp = 0
-    exact_fp = 0
-    exact_fn = 0
 
     for record in records:
         row_id = record.get("row_id")
@@ -446,21 +443,8 @@ def evaluate_span_predictions(
         else:
             rouge_scores.append(1.0)
 
-        gold_set = set(gold_spans)
-        pred_set = set(pred_spans)
-        exact_tp += len(gold_set & pred_set)
-        exact_fp += len(pred_set - gold_set)
-        exact_fn += len(gold_set - pred_set)
-
-    precision = exact_tp / max(1, exact_tp + exact_fp)
-    recall = exact_tp / max(1, exact_tp + exact_fn)
-    exact_f1 = 0.0 if precision + recall == 0 else 2 * precision * recall / (precision + recall)
-
     return {
         "rouge1_f1": float(np.mean(rouge_scores)) if rouge_scores else 0.0,
-        "exact_match_precision": precision,
-        "exact_match_recall": recall,
-        "exact_match_f1": exact_f1,
     }
 
 
