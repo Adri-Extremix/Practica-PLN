@@ -8,6 +8,7 @@ Incluye early stopping, scheduler con warmup y logging.
 import os
 import time
 import numpy as np
+import pandas as pd
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -317,6 +318,155 @@ def predict(
 
     return np.vstack(all_probs)
 
+
+# ──────────────────────────────────────────────
+# Comparación de modelos candidatos
+# ──────────────────────────────────────────────
+
+def compare_models(
+    model_names: List[str],
+    train_loader: DataLoader,
+    dev_loader: DataLoader,
+    device: torch.device,
+    num_labels: int = 7,
+    num_epochs: int = 3,
+    learning_rate: float = 2e-5,
+    warmup_ratio: float = 0.1,
+    weight_decay: float = 0.01,
+    threshold: float = 0.5,
+    pos_weight: Optional[torch.Tensor] = None,
+    save_dir: str = "outputs/model_comparison",
+    monitor_metric: str = "f1_macro",
+    early_stopping_patience: int = 2,
+) -> "pd.DataFrame":
+    """
+    Entrena cada arquitectura de la lista y devuelve un ranking comparativo.
+
+    Se recomienda usar esta función en lugar de HPO sobre un único modelo:
+    explorar distintas arquitecturas suele ofrecer mayor ganancia con el
+    mismo presupuesto de cómputo.
+
+    Args:
+        model_names:            Lista de nombres HuggingFace a comparar.
+                                Usa ``[m["name"] for m in CANDIDATE_MODELS]``
+                                de model.py para obtener la lista completa.
+        train_loader:           DataLoader de entrenamiento (ya construido).
+        dev_loader:             DataLoader de validación.
+        device:                 Dispositivo (cuda/cpu).
+        num_labels:             Número de etiquetas de emoción.
+        num_epochs:             Épocas máximas por modelo.
+        monitor_metric:         Métrica para el ranking final ('f1_macro', …).
+        early_stopping_patience: Paciencia por modelo.
+        ...resto:               Igual que train().
+
+    Returns:
+        DataFrame con columnas ['model', monitor_metric, 'best_epoch',
+        'train_loss', 'dev_loss', 'status'], ordenado de mejor a peor.
+
+    Example::
+        from src.model import CANDIDATE_MODELS
+        names = [m["name"] for m in CANDIDATE_MODELS if m["multilingual"]]
+        results = compare_models(names, train_loader, dev_loader, device)
+    """
+    import pandas as pd  # ya importado en el módulo; se deja explícito por claridad
+    from src.model import build_model, build_tokenizer
+    from src.dataset import build_dataloader
+
+    # Extraer textos, etiquetas y parámetros del loader original
+    # para poder retokenizar con cada arquitectura
+    train_texts  = train_loader.dataset.texts
+    train_labels = train_loader.dataset.labels
+    dev_texts    = dev_loader.dataset.texts
+    dev_labels   = dev_loader.dataset.labels
+    batch_size   = train_loader.batch_size
+    max_length   = train_loader.dataset.max_length
+
+    os.makedirs(save_dir, exist_ok=True)
+    rows = []
+
+    for model_name in model_names:
+        print(f"\n{'='*60}")
+        print(f"  Evaluando: {model_name}")
+        print(f"{'='*60}")
+
+        try:
+            # Tokenizer y dataloaders propios de esta arquitectura
+            # (cada modelo tiene un vocabulario distinto: reutilizar
+            # los IDs de otro tokenizer causa índices fuera de rango en GPU)
+            tokenizer = build_tokenizer(model_name)
+            arch_train_loader = build_dataloader(
+                train_texts, tokenizer, train_labels,
+                max_length=max_length, batch_size=batch_size,
+                shuffle=True,
+            )
+            arch_dev_loader = build_dataloader(
+                dev_texts, tokenizer, dev_labels,
+                max_length=max_length, batch_size=batch_size,
+                shuffle=False,
+            )
+
+            model = build_model(model_name=model_name, num_labels=num_labels)
+            model = model.float()
+            safe_name = model_name.replace("/", "_")
+
+            history = train(
+                model=model,
+                train_loader=arch_train_loader,
+                dev_loader=arch_dev_loader,
+                device=device,
+                num_epochs=num_epochs,
+                learning_rate=learning_rate,
+                warmup_ratio=warmup_ratio,
+                weight_decay=weight_decay,
+                threshold=threshold,
+                pos_weight=pos_weight,
+                save_dir=save_dir,
+                model_name=f"{safe_name}_best.pt",
+                early_stopping_patience=early_stopping_patience,
+                monitor_metric=monitor_metric,
+                verbose=True,
+            )
+
+            metric_values   = [m.get(monitor_metric, 0.0) for m in history["dev_metrics"]]
+            best_epoch      = int(np.argmax(metric_values)) + 1
+            best_metric_val = max(metric_values)
+
+            rows.append({
+                "model":        model_name,
+                monitor_metric: round(best_metric_val, 4),
+                "best_epoch":   best_epoch,
+                "train_loss":   round(history["train_loss"][best_epoch - 1], 4),
+                "dev_loss":     round(history["dev_loss"][best_epoch - 1], 4),
+                "status":       "ok",
+            })
+
+        except Exception as exc:
+            print(f"  ✗ Error con {model_name}: {exc}")
+            rows.append({
+                "model":        model_name,
+                monitor_metric: 0.0,
+                "best_epoch":   0,
+                "train_loss":   None,
+                "dev_loss":     None,
+                "status":       f"error: {exc}",
+            })
+
+    results_df = (
+        pd.DataFrame(rows)
+        .sort_values(monitor_metric, ascending=False)
+        .reset_index(drop=True)
+    )
+
+    print(f"\n{'='*60}")
+    print("  Ranking final de modelos")
+    print(f"{'='*60}")
+    print(results_df.to_string(index=False))
+
+    csv_path = os.path.join(save_dir, "model_comparison.csv")
+    results_df.to_csv(csv_path, index=False)
+    print(f"\nResultados guardados en {csv_path}")
+
+    return results_df
 
 # ──────────────────────────────────────────────
 # Construcción del optimizer/scheduler de forma standalone
