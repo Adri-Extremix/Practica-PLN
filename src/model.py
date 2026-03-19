@@ -8,7 +8,52 @@ Basado en microsoft/mdeberta-v3-base con cabeza clasificadora propia.
 import torch
 import torch.nn as nn
 from transformers import AutoModel, AutoConfig, AutoTokenizer
-from typing import Optional
+from typing import Optional, List, Dict
+
+
+# ──────────────────────────────────────────────
+# Modelos candidatos para comparación
+# Mejor explorar distintas arquitecturas que hacer HPO
+# sobre un único modelo.
+# ──────────────────────────────────────────────
+
+CANDIDATE_MODELS: List[Dict] = [
+    {
+        "name":        "microsoft/mdeberta-v3-base",
+        "description": "mDeBERTa v3 – fuerte en tareas multilingüe, mejor baseline general",
+        "multilingual": True,
+    },
+    {
+        "name":        "xlm-roberta-base",
+        "description": "XLM-RoBERTa base – robusto, ampliamente usado en NLP multilingüe",
+        "multilingual": True,
+    },
+    {
+        "name":        "xlm-roberta-large",
+        "description": "XLM-RoBERTa large – mayor capacidad, requiere más VRAM",
+        "multilingual": True,
+    },
+    {
+        "name":        "roberta-base",
+        "description": "RoBERTa base – solo inglés, útil como baseline monolingüe",
+        "multilingual": False,
+    },
+    {
+        "name":        "bert-base-multilingual-cased",
+        "description": "mBERT cased – baseline clásico multilingüe",
+        "multilingual": True,
+    },
+]
+
+
+def list_candidate_models(multilingual_only: bool = False) -> None:
+    """Imprime los modelos candidatos disponibles."""
+    models = CANDIDATE_MODELS if not multilingual_only else [m for m in CANDIDATE_MODELS if m["multilingual"]]
+    print(f"{'Modelo':<45} {'Multilingüe':<14} Descripción")
+    print("-" * 100)
+    for m in models:
+        tag = "✓" if m["multilingual"] else "✗"
+        print(f"{m['name']:<45} {tag:<14} {m['description']}")
 
 
 # ──────────────────────────────────────────────
@@ -94,8 +139,10 @@ class MultiLabelEmotionClassifier(nn.Module):
         result = {"logits": logits}
 
         if labels is not None:
-            loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
-            result["loss"] = loss_fn(logits, labels)
+             if pos_weight is not None:
+                pos_weight = pos_weight.to(logits.device)
+             loss_fn = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
+             result["loss"] = loss_fn(logits, labels)
 
         return result
 

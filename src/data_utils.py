@@ -16,23 +16,16 @@ from typing import List, Dict, Tuple, Optional
 # Constantes globales
 # ──────────────────────────────────────────────
 
-EMOTION_LABELS = ["sadness", "joy", "love", "anger", "fear", "surprise", "neutral/unclear"]
+EMOTION_LABELS = ["sadness", "joy", "love", "anger", "fear", "surprise", "Nuetral/unclear"]
 
 EMOTION2IDX = {label: idx for idx, label in enumerate(EMOTION_LABELS)}
 IDX2EMOTION = {idx: label for label, idx in EMOTION2IDX.items()}
 
-# Normalización de variantes ruidosas encontradas en los datos reales
-# "Nuetral/unclear", "neutral", "Neutral" → "neutral/unclear"
-EMOTION_NORMALIZATION = {
-    "nuetral/unclear": "neutral/unclear",
-    "neutral":         "neutral/unclear",
-    "neutral/unclear": "neutral/unclear",
-}
-
 
 def normalize_emotion(emotion: str) -> str:
-    """Normaliza una etiqueta de emoción a su forma canónica."""
-    return EMOTION_NORMALIZATION.get(emotion.lower().strip(), emotion.lower().strip())
+    """Devuelve la etiqueta en minúsculas sin espacios para comparación interna.
+    No se modifica el valor original del dataset (p.ej. 'Nuetral/unclear' se conserva)."""
+    return emotion.lower().strip()
 
 PRIMARY_LABELS = [
 	"General Hope",
@@ -104,9 +97,7 @@ def load_split(path: str, combine_title: bool = True) -> pd.DataFrame:
     elif "selftext" in df.columns:
         df["text"] = df["selftext"]
 
-    # Renombrar trigger_emotions → emotions para compatibilidad interna
-    if "trigger_emotions" in df.columns and "emotions" not in df.columns:
-        df["emotions"] = df["trigger_emotions"]
+    # Mantener el nombre original 'trigger_emotions' del dataset
 
     # Renombrar row_id → id para compatibilidad interna
     if "row_id" in df.columns and "id" not in df.columns:
@@ -260,7 +251,7 @@ def decode_emotions(
     ]
 
 
-def add_emotion_vectors(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.DataFrame:
+def add_emotion_vectors(df: pd.DataFrame, emotions_col: str = "trigger_emotions") -> pd.DataFrame:
     """
     Añade al DataFrame una columna 'emotion_vector' con el vector binario multietiqueta.
     Asume que la columna `emotions_col` contiene listas de strings.
@@ -284,7 +275,7 @@ def hope_distribution(df: pd.DataFrame, hope_col: str = "primary_label") -> pd.S
             counts[hope] += 1
     return pd.Series(counts).sort_values(ascending=False)
 
-def emotion_distribution(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.Series:
+def emotion_distribution(df: pd.DataFrame, emotions_col: str = "trigger_emotions") -> pd.Series:
     """Calcula la frecuencia de cada emoción en el dataset."""
     counts = {label: 0 for label in EMOTION_LABELS}
     for emotions in df[emotions_col]:
@@ -296,7 +287,7 @@ def emotion_distribution(df: pd.DataFrame, emotions_col: str = "emotions") -> pd
     return pd.Series(counts).sort_values(ascending=False)
 
 
-def cooccurrence_matrix(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.DataFrame:
+def cooccurrence_matrix(df: pd.DataFrame, emotions_col: str = "trigger_emotions") -> pd.DataFrame:
     """Calcula la matriz de co-ocurrencia de emociones."""
     n = len(EMOTION_LABELS)
     matrix = np.zeros((n, n), dtype=int)
@@ -314,7 +305,7 @@ def cooccurrence_matrix(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.
     return pd.DataFrame(matrix, index=EMOTION_LABELS, columns=EMOTION_LABELS)
 
 
-def compute_class_weights(df: pd.DataFrame, emotions_col: str = "emotions", labels: list[str] = EMOTION_LABELS) -> np.ndarray:
+def compute_class_weights(df: pd.DataFrame, emotions_col: str = "trigger_emotions", labels: list[str] = EMOTION_LABELS) -> np.ndarray:
     """
     Calcula pesos por clase para manejar el desbalanceo.
     Útil para pasar a BCEWithLogitsLoss como pos_weight.
@@ -325,7 +316,7 @@ def compute_class_weights(df: pd.DataFrame, emotions_col: str = "emotions", labe
     for label in labels:
         n_pos = sum(
             1 for emotions in df[emotions_col]
-            if isinstance(emotions, list) and label in [normalize_emotion(e) for e in emotions]
+            if isinstance(emotions, list) and label in emotions
         )
         n_pos = max(n_pos, 1)  # evitar división por cero
         weights.append((n - n_pos) / n_pos)
@@ -373,7 +364,7 @@ def format_predictions_for_submission(
     rows = []
     for id_, pred in zip(ids, predictions):
         emotions = decode_emotions(pred, label_set, threshold)
-        rows.append({"id": id_, "emotions": emotions})
+        rows.append({"id": id_, "trigger_emotions": emotions})
     return pd.DataFrame(rows)
 
 
