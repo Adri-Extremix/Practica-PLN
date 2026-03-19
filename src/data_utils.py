@@ -35,12 +35,12 @@ def normalize_emotion(emotion: str) -> str:
     return EMOTION_NORMALIZATION.get(emotion.lower().strip(), emotion.lower().strip())
 
 PRIMARY_LABELS = [
-    "realistic_hope",
-    "unrealistic_hope",
-    "general_hope",
-    "hopelessness",
-    "sarcastic_hope",
-    "not_hope",
+	"General Hope",
+    "Realistic Hope",
+    "Unrealistic Hope",
+    "Sarcastic Hope",
+    "Hopelessness",
+    "Not Hope",
 ]
 
 # ──────────────────────────────────────────────
@@ -178,6 +178,47 @@ def apply_cleaning(df: pd.DataFrame, text_col: str = "text", **kwargs) -> pd.Dat
     df[text_col] = df[text_col].apply(lambda t: clean_text(t, **kwargs))
     return df
 
+# ──────────────────────────────────────────────
+# Codificación de esperanza (Task A)
+# ──────────────────────────────────────────────
+
+def encode_hope(
+    label: str,
+    label_set: List[str] = PRIMARY_LABELS,
+) -> int:
+    """
+    Convierte una esperanza a vector binario.
+    Aplica normalización automática.
+
+    Ejemplo:
+        encode_hope("General Hope")  →  [1, 0, 0, 0, 0, 0]
+    """
+    vector = [0] * len(label_set)
+    if label in label_set:
+        vector[label_set.index(label)] = 1
+    return vector
+
+
+def decode_hope(
+    binary_vector: List[int],
+    label_set: List[str] = PRIMARY_LABELS,
+) -> str:
+    """
+    Convierte un vector binario (o de probabilidades) a una etiqueta
+    Si se pasan probabilidades, toma el máximo.
+    """
+    return label_set[max(enumerate(binary_vector), key=lambda x: x[1])[0]]
+
+
+def add_hope(df: pd.DataFrame, hope_col: str = "primary_labels") -> pd.DataFrame:
+    """
+    Añade al DataFrame una columna 'hope' con el entero.
+    Asume que la columna `hope_col` contiene un string.
+    """
+    df = df.copy()
+    df["hope"] = df[hope_col].apply(encode_hope)
+    return df
+
 
 # ──────────────────────────────────────────────
 # Codificación de etiquetas (Task B)
@@ -200,7 +241,7 @@ def encode_emotions(
         e = normalize_emotion(emotion)   # normalizar antes de buscar
         if e in label_set_lower:
             vector[label_set_lower.index(e)] = 1
-    return vector
+    return np.array(vector, dtype=np.int8)
 
 
 def decode_emotions(
@@ -235,6 +276,14 @@ def add_emotion_vectors(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.
 # Estadísticas del dataset
 # ──────────────────────────────────────────────
 
+def hope_distribution(df: pd.DataFrame, hope_col: str = "primary_label") -> pd.Series:
+    """Calcula la frecuencia de cada esperanza en el dataset."""
+    counts = {label: 0 for label in PRIMARY_LABELS}
+    for hope in df[hope_col]:
+        if hope in counts:
+            counts[hope] += 1
+    return pd.Series(counts).sort_values(ascending=False)
+
 def emotion_distribution(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.Series:
     """Calcula la frecuencia de cada emoción en el dataset."""
     counts = {label: 0 for label in EMOTION_LABELS}
@@ -265,7 +314,7 @@ def cooccurrence_matrix(df: pd.DataFrame, emotions_col: str = "emotions") -> pd.
     return pd.DataFrame(matrix, index=EMOTION_LABELS, columns=EMOTION_LABELS)
 
 
-def compute_class_weights(df: pd.DataFrame, emotions_col: str = "emotions") -> np.ndarray:
+def compute_class_weights(df: pd.DataFrame, emotions_col: str = "emotions", labels: list[str] = EMOTION_LABELS) -> np.ndarray:
     """
     Calcula pesos por clase para manejar el desbalanceo.
     Útil para pasar a BCEWithLogitsLoss como pos_weight.
@@ -273,7 +322,7 @@ def compute_class_weights(df: pd.DataFrame, emotions_col: str = "emotions") -> n
     """
     n = len(df)
     weights = []
-    for label in EMOTION_LABELS:
+    for label in labels:
         n_pos = sum(
             1 for emotions in df[emotions_col]
             if isinstance(emotions, list) and label in [normalize_emotion(e) for e in emotions]
@@ -286,6 +335,25 @@ def compute_class_weights(df: pd.DataFrame, emotions_col: str = "emotions") -> n
 # ──────────────────────────────────────────────
 # Formateo de predicciones para CodaBench
 # ──────────────────────────────────────────────
+
+def format_predictions_for_submission_hope(
+    ids: List[str],
+    predictions: List[List[int]],
+    label_set: List[str] = PRIMARY_LABELS,
+) -> pd.DataFrame:
+    """
+    Genera un DataFrame con el formato de submission para CodaBench.
+
+    Args:
+        ids: Lista de identificadores de ejemplo.
+        predictions: Lista de vectores binarios o probabilidades.
+        label_set: Etiquetas de emoción.
+    """
+    rows = []
+    for id_, pred in zip(ids, predictions):
+        hope = decode_hope(pred, label_set)
+        rows.append({"id": id_, "primary_label": hope})
+    return pd.DataFrame(rows)
 
 def format_predictions_for_submission(
     ids: List[str],

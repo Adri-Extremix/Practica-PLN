@@ -22,18 +22,21 @@ from src.data_utils import EMOTION_LABELS
 # Binarización de predicciones
 # ──────────────────────────────────────────────
 
-def binarize(probs: np.ndarray, threshold: float = 0.5) -> np.ndarray:
+def binarize(probs: np.ndarray, threshold: float | bool = 0.5) -> np.ndarray:
     """
     Convierte probabilidades a predicciones binarias.
 
     Args:
         probs: Array [n_samples, n_labels] con probabilidades.
-        threshold: Umbral de decisión.
+        threshold: Umbral de decisión. Si bool, la decision escoge el máximo.
 
     Returns:
         Array binario [n_samples, n_labels].
     """
-    return (probs >= threshold).astype(int)
+    if isinstance(threshold, float):
+        return (probs >= threshold).astype(int)
+    i = probs.argmax(axis=1)
+    return np.eye(probs.shape[1])[i].astype(int)
 
 
 # ──────────────────────────────────────────────
@@ -43,7 +46,7 @@ def binarize(probs: np.ndarray, threshold: float = 0.5) -> np.ndarray:
 def compute_metrics(
     y_true: np.ndarray,
     y_pred_probs: np.ndarray,
-    threshold: float = 0.5,
+    threshold: float | bool = 0.5,
     label_names: List[str] = EMOTION_LABELS,
 ) -> Dict[str, float]:
     """
@@ -92,7 +95,7 @@ def print_metrics(metrics: Dict[str, float], label_names: List[str] = EMOTION_LA
     print(f"  Hamming Loss:{metrics['hamming_loss']:.4f}")
     print(f"  Threshold:   {metrics['threshold']:.2f}")
     print("-" * 50)
-    print("  F1 por emoción:")
+    print("  F1 por etiqueta:")
     for label in label_names:
         key = f"f1_{label}"
         if key in metrics:
