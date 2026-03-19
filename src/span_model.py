@@ -26,6 +26,7 @@ def build_span_model(
         id2label=ID2LABEL,
         label2id=LABEL2ID,
         dtype=torch.float32,
+        ignore_mismatched_sizes=True,
     )
     return model.float()
 
