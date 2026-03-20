@@ -3,7 +3,7 @@
 .env
 .python-version
 *.pt
-outputs/
+
 
 
 # Byte-compiled / optimized / DLL files
@@ -213,3 +213,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# ML Models and large files
+*.safetensors
+*.bin
+*.h5
+**/best_model/
+**/model_comparison/*_best/

@@ -1,0 +1,2 @@
+model,rouge1_f1,best_epoch,train_loss,dev_loss,status
+distilbert-base-uncased,0.0541,1,1.0572,1.0005,ok

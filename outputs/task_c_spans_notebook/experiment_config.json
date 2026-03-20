@@ -1,0 +1,31 @@
+{
+  "model_name": "distilbert-base-uncased",
+  "comparison_epochs": 1,
+  "max_length": 128,
+  "stride": 32,
+  "batch_size": 8,
+  "epochs": 1,
+  "learning_rate": 2e-05,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.1,
+  "patience": 3,
+  "grad_clip": 1.0,
+  "use_class_weights": true,
+  "seed": 42,
+  "quick_smoke_test": true,
+  "best_dev_loss": 1.0254478317040663,
+  "best_dev_metrics_default_postprocess": {
+    "rouge1_f1": 0.018172251095345468
+  },
+  "best_dev_metrics_tuned_postprocess": {
+    "rouge1_f1": 0.3009607549492418
+  },
+  "optimal_postprocess": {
+    "max_spans": 3,
+    "overlap_threshold": 0.7,
+    "min_span_score": 0.55
+  },
+  "train_examples": 64,
+  "dev_examples": 32,
+  "test_examples": 32
+}
