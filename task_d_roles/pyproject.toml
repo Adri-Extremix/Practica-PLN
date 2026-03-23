@@ -1,0 +1,28 @@
+[project]
+name = "task-d-roles"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "matplotlib>=3.10.8",
+    "pandas>=3.0.1",
+    "protobuf>=7.34.1",
+    "scikit-learn>=1.8.0",
+    "sentencepiece>=0.2.1",
+    "spacy>=3.8.11",
+    "tiktoken>=0.12.0",
+    "torch>=2.10.0",
+    "transformers>=5.3.0",
+]
+
+[dependency-groups]
+dev = [
+    "autopep8>=2.3.2",
+    "mypy>=1.19.1",
+    "pandas-stubs>=3.0.0.260204",
+    "microsoft-python-type-stubs",
+]
+
+[tool.uv.sources]
+microsoft-python-type-stubs = { git = "https://github.com/microsoft/python-type-stubs.git" }
